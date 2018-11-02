@@ -57,6 +57,19 @@ VkResult destroyDebugUtilsMessengerEXT(
 }
 
 
+bool isDeviceSuitable(VkPhysicalDevice device)
+{
+	VkPhysicalDeviceProperties dev_properties;
+	vkGetPhysicalDeviceProperties(device, &dev_properties);
+
+	VkPhysicalDeviceFeatures dev_features;
+	vkGetPhysicalDeviceFeatures(device, &dev_features);
+
+	return dev_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
+		dev_features.geometryShader;
+}
+
+
 void VulkanProg::initVulkan()
 {
 	if (enable_validation_layer && !checkValidationlayerSupport())
@@ -90,6 +103,7 @@ void VulkanProg::initVulkan()
 		throw std::runtime_error("Failed to create Vulkan instance.");
 
 	setupDebugCb();
+	pickPhysicalDevice();
 }
 
 void VulkanProg::initWindow()
@@ -168,4 +182,26 @@ void VulkanProg::setupDebugCb()
 
 	if (createDebugUtilsMessengerEXT(m_instance, &create_info, nullptr, &m_debug_messenger) != VK_SUCCESS)
 		throw std::runtime_error("Failed to create debug callback.");
+}
+
+void VulkanProg::pickPhysicalDevice()
+{
+	uint32_t count = 0;
+	vkEnumeratePhysicalDevices(m_instance, &count, nullptr);
+
+	if (!count)
+		throw std::runtime_error("No Vulkan capable physical devices.");
+
+	std::vector<VkPhysicalDevice> devices(count);
+	vkEnumeratePhysicalDevices(m_instance, &count, devices.data());
+	
+	for (const auto& device : devices) {
+		if (isDeviceSuitable(device)) {
+			m_device = device;
+			break;
+		}
+	}
+
+	if (m_device == VK_NULL_HANDLE)
+		throw std::runtime_error("No suitable Vulkan devices found.");
 }

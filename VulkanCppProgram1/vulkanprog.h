@@ -31,11 +31,13 @@ private:
 	bool checkValidationlayerSupport();
 	std::vector<const char*> getRequiredExtensions();
 	void setupDebugCb();
+	void pickPhysicalDevice();
 
 private:
 	GLFWwindow* m_window;
 	VkInstance m_instance;
 	VkDebugUtilsMessengerEXT m_debug_messenger;
+	VkPhysicalDevice m_device = VK_NULL_HANDLE;
 
 	const int WIDTH = 800;
 	const int HEIGHT = 600;
