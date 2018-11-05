@@ -3,3 +3,7 @@
 ################################################################################
 
 /.vs/VulkanCppProgram1/v15
+/VulkanCppProgram1/x64/Debug
+/x64
+/VulkanCppProgram1/VulkanCppProgram1.vcxproj.user
+/VulkanCppProgram1/VulkanCppProgram1.vcxproj.filters

@@ -2,10 +2,6 @@
 #define __VULKAN_PROG__
 
 #include <vulkan/vulkan.hpp>
-#include <stdexcept>
-#include <iostream>
-#include <functional>
-#include <cstdlib>
 
 
 struct GLFWwindow;
@@ -32,12 +28,15 @@ private:
 	std::vector<const char*> getRequiredExtensions();
 	void setupDebugCb();
 	void pickPhysicalDevice();
+	void createLogicalDevice();
 
 private:
 	GLFWwindow* m_window;
 	VkInstance m_instance;
 	VkDebugUtilsMessengerEXT m_debug_messenger;
 	VkPhysicalDevice m_device = VK_NULL_HANDLE;
+	VkDevice m_logical_device;
+	VkQueue m_graphics_queue;
 
 	const int WIDTH = 800;
 	const int HEIGHT = 600;
