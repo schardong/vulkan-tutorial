@@ -5,6 +5,7 @@
 
 
 struct GLFWwindow;
+struct QueueFamilyIndices;
 
 
 class VulkanProg
@@ -29,6 +30,8 @@ private:
 	void setupDebugCb();
 	void pickPhysicalDevice();
 	void createLogicalDevice();
+	bool isDeviceSuitable(VkPhysicalDevice device);
+	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice dev);
 
 private:
 	GLFWwindow* m_window;
@@ -37,6 +40,8 @@ private:
 	VkPhysicalDevice m_device = VK_NULL_HANDLE;
 	VkDevice m_logical_device;
 	VkQueue m_graphics_queue;
+	VkQueue m_presentation_queue;
+	VkSurfaceKHR m_surface;
 
 	const int WIDTH = 800;
 	const int HEIGHT = 600;
