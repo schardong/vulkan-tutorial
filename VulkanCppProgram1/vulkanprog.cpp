@@ -160,7 +160,9 @@ void VulkanProg::initVulkan()
 	createLogicalDevice();
 	createSwapChain();
 	createImageViews();
+	createRenderPass();
 	createGraphicsPipeline();
+	createFramebuffers();
 }
 
 void VulkanProg::initWindow()
@@ -180,6 +182,10 @@ void VulkanProg::mainLoop()
 
 void VulkanProg::cleanup()
 {
+	for (auto fb : m_swapchain_framebuffers)
+		vkDestroyFramebuffer(m_logical_device, fb, nullptr);
+
+	vkDestroyPipeline(m_logical_device, m_graphics_pipeline, nullptr);
 	vkDestroyPipelineLayout(m_logical_device, m_pipeline_layout, nullptr);
 	vkDestroyRenderPass(m_logical_device, m_renderpass, nullptr);
 	for (auto iv : m_swapchain_image_views)
@@ -567,18 +573,63 @@ void VulkanProg::createGraphicsPipeline()
 	color_blend_info.blendConstants[3] = 0.0f;
 
 	// Pipeline layout creation
-	VkPipelineLayoutCreateInfo pp_layout_info = {};
-	pp_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pp_layout_info.setLayoutCount = 0;
-	pp_layout_info.pSetLayouts = nullptr;
-	pp_layout_info.pushConstantRangeCount = 0;
-	pp_layout_info.pPushConstantRanges = nullptr;
+	VkPipelineLayoutCreateInfo pipeline_layout_info = {};
+	pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	pipeline_layout_info.setLayoutCount = 0;
+	pipeline_layout_info.pSetLayouts = nullptr;
+	pipeline_layout_info.pushConstantRangeCount = 0;
+	pipeline_layout_info.pPushConstantRanges = nullptr;
 
-	if (vkCreatePipelineLayout(m_logical_device, &pp_layout_info, nullptr, &m_pipeline_layout) != VK_SUCCESS)
+	if (vkCreatePipelineLayout(m_logical_device, &pipeline_layout_info, nullptr, &m_pipeline_layout) != VK_SUCCESS)
 		throw std::runtime_error("Failed to create pipeline layout.");
+
+	// Actual pipeline creation
+	VkGraphicsPipelineCreateInfo pipeline_info = {};
+	pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	pipeline_info.stageCount = 2;
+	pipeline_info.pStages = shader_stages;
+	pipeline_info.pVertexInputState = &vertex_input_info;
+	pipeline_info.pInputAssemblyState = &vertex_assembly_info;
+	pipeline_info.pViewportState = &viewport_info;
+	pipeline_info.pRasterizationState = &raster_info;
+	pipeline_info.pMultisampleState = &msample_info;
+	pipeline_info.pDepthStencilState = nullptr;
+	pipeline_info.pColorBlendState = &color_blend_info;
+	pipeline_info.pDynamicState = nullptr;
+	pipeline_info.layout = m_pipeline_layout;
+	pipeline_info.renderPass = m_renderpass;
+	pipeline_info.subpass = 0;
+	pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
+	pipeline_info.basePipelineIndex = -1;
+
+	if (vkCreateGraphicsPipelines(m_logical_device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &m_graphics_pipeline) != VK_SUCCESS)
+		throw std::runtime_error("Failed to create graphics pipeline.");
 
 	vkDestroyShaderModule(m_logical_device, vert_shader, nullptr);
 	vkDestroyShaderModule(m_logical_device, frag_shader, nullptr);
+}
+
+void VulkanProg::createFramebuffers()
+{
+	m_swapchain_framebuffers.resize(m_swapchain_image_views.size());
+
+	for (size_t i = 0; i < m_swapchain_image_views.size(); ++i) {
+		VkImageView attach[] = {
+			m_swapchain_image_views[i]
+		};
+
+		VkFramebufferCreateInfo fb_info = {};
+		fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		fb_info.renderPass = m_renderpass;
+		fb_info.attachmentCount = 1;
+		fb_info.pAttachments = attach;
+		fb_info.width = m_swapchain_extent.width;
+		fb_info.height= m_swapchain_extent.height;
+		fb_info.layers = 1;
+
+		if (vkCreateFramebuffer(m_logical_device, &fb_info, nullptr, &m_swapchain_framebuffers[i]) != VK_SUCCESS)
+			throw std::runtime_error("Failed to create framebuffer.");
+	}
 }
 
 VkShaderModule VulkanProg::createShaderModule(const std::vector<char>& bytecode)

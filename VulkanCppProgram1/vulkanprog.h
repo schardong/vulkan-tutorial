@@ -35,6 +35,7 @@ private:
 	void createImageViews();
 	void createRenderPass();
 	void createGraphicsPipeline();
+	void createFramebuffers();
 	VkShaderModule createShaderModule(const std::vector<char>& bytecode);
 	bool isDeviceSuitable(VkPhysicalDevice device);
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
@@ -59,6 +60,8 @@ private:
 	std::vector<VkImageView> m_swapchain_image_views;
 	VkRenderPass m_renderpass;
 	VkPipelineLayout m_pipeline_layout;
+	VkPipeline m_graphics_pipeline;
+	std::vector<VkFramebuffer> m_swapchain_framebuffers;
 
 	const int WIDTH = 800;
 	const int HEIGHT = 600;
