@@ -6,6 +6,7 @@
 
 struct GLFWwindow;
 struct QueueFamilyIndices;
+struct SwapChainSupportDetails;
 
 
 class VulkanProg
@@ -30,8 +31,13 @@ private:
 	void setupDebugCb();
 	void pickPhysicalDevice();
 	void createLogicalDevice();
+	void createSwapChain();
 	bool isDeviceSuitable(VkPhysicalDevice device);
-	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice dev);
+	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
+	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
+	VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& available_formats);
+	VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& available_present_modes);
+	VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
 
 private:
 	GLFWwindow* m_window;
@@ -42,6 +48,10 @@ private:
 	VkQueue m_graphics_queue;
 	VkQueue m_presentation_queue;
 	VkSurfaceKHR m_surface;
+	VkSwapchainKHR m_swapchain;
+	VkFormat m_swapchain_format;
+	VkExtent2D m_swapchain_extent;
+	std::vector<VkImage> m_swapchain_images;
 
 	const int WIDTH = 800;
 	const int HEIGHT = 600;
@@ -50,6 +60,11 @@ private:
 
 const std::vector<const char*> validation_layers = {
 	"VK_LAYER_LUNARG_standard_validation"
+};
+
+
+const std::vector<const char*> device_extensions = {
+	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
 
