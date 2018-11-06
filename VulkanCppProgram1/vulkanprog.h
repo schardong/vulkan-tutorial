@@ -33,6 +33,7 @@ private:
 	void createLogicalDevice();
 	void createSwapChain();
 	void createImageViews();
+	void createRenderPass();
 	void createGraphicsPipeline();
 	VkShaderModule createShaderModule(const std::vector<char>& bytecode);
 	bool isDeviceSuitable(VkPhysicalDevice device);
@@ -56,6 +57,7 @@ private:
 	VkExtent2D m_swapchain_extent;
 	std::vector<VkImage> m_swapchain_images;
 	std::vector<VkImageView> m_swapchain_image_views;
+	VkRenderPass m_renderpass;
 	VkPipelineLayout m_pipeline_layout;
 
 	const int WIDTH = 800;

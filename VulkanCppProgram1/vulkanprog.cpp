@@ -181,6 +181,7 @@ void VulkanProg::mainLoop()
 void VulkanProg::cleanup()
 {
 	vkDestroyPipelineLayout(m_logical_device, m_pipeline_layout, nullptr);
+	vkDestroyRenderPass(m_logical_device, m_renderpass, nullptr);
 	for (auto iv : m_swapchain_image_views)
 		vkDestroyImageView(m_logical_device, iv, nullptr);
 
@@ -392,6 +393,38 @@ void VulkanProg::createImageViews()
 		if (vkCreateImageView(m_logical_device, &create_info, nullptr, &m_swapchain_image_views[i]) != VK_SUCCESS)
 			throw std::runtime_error("Failed to create image view.");
 	}
+}
+
+void VulkanProg::createRenderPass()
+{
+	VkAttachmentDescription color_attach = {};
+	color_attach.format = m_swapchain_format;
+	color_attach.samples = VK_SAMPLE_COUNT_1_BIT;
+	color_attach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	color_attach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	color_attach.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	color_attach.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	color_attach.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	color_attach.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+	VkAttachmentReference color_attach_ref = {};
+	color_attach_ref.attachment = 0;
+	color_attach_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	VkSubpassDescription subpass_info = {};
+	subpass_info.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass_info.colorAttachmentCount = 1;
+	subpass_info.pColorAttachments = &color_attach_ref;
+
+	VkRenderPassCreateInfo render_pass_info = {};
+	render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	render_pass_info.attachmentCount = 1;
+	render_pass_info.pAttachments = &color_attach;
+	render_pass_info.subpassCount = 1;
+	render_pass_info.pSubpasses = &subpass_info;
+
+	if (vkCreateRenderPass(m_logical_device, &render_pass_info, nullptr, &m_renderpass) != VK_SUCCESS)
+		throw std::runtime_error("Failed to create render pass.");
 }
 
 void VulkanProg::createGraphicsPipeline()
