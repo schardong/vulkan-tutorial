@@ -38,6 +38,7 @@ private:
 	void createFramebuffers();
 	void createCommandPool();
 	void createCommandBuffers();
+	void createSyncObjects();
 	void drawFrame();
 
 	VkShaderModule createShaderModule(const std::vector<char>& bytecode);
@@ -68,6 +69,10 @@ private:
 	std::vector<VkFramebuffer> m_swapchain_framebuffers;
 	VkCommandPool m_command_pool;
 	std::vector<VkCommandBuffer> m_command_buffers;
+	std::vector<VkSemaphore> m_image_available_semaphores;
+	std::vector<VkSemaphore> m_render_finished_semaphores;
+	std::vector<VkFence> m_inflight_fences;
+	size_t m_current_frame = 0;
 
 	const int WIDTH = 800;
 	const int HEIGHT = 600;
@@ -82,6 +87,9 @@ const std::vector<const char*> validation_layers = {
 const std::vector<const char*> device_extensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
+
+
+const int MAX_FRAMES_IN_FLIGHT = 2;
 
 
 #endif  __VULKAN_PROG__
