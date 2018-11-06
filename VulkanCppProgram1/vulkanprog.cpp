@@ -140,6 +140,8 @@ void VulkanProg::initVulkan()
 	pickPhysicalDevice();
 	createLogicalDevice();
 	createSwapChain();
+	createImageViews();
+	createGraphicsPipeline();
 }
 
 void VulkanProg::initWindow()
@@ -159,11 +161,15 @@ void VulkanProg::mainLoop()
 
 void VulkanProg::cleanup()
 {
+	for (auto iv : m_swapchain_image_views)
+		vkDestroyImageView(m_logical_device, iv, nullptr);
+
 	vkDestroySwapchainKHR(m_logical_device, m_swapchain, nullptr);
 	vkDestroyDevice(m_logical_device, nullptr);
-	if (enable_validation_layer) {
+
+	if (enable_validation_layer)
 		destroyDebugUtilsMessengerEXT(m_instance, m_debug_messenger, nullptr);
-	}
+
 	vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
 	vkDestroyInstance(m_instance, nullptr);
 	glfwDestroyWindow(m_window);
@@ -341,6 +347,38 @@ void VulkanProg::createSwapChain()
 	vkGetSwapchainImagesKHR(m_logical_device, m_swapchain, &image_count, m_swapchain_images.data());
 }
 
+void VulkanProg::createImageViews()
+{
+	m_swapchain_image_views.resize(m_swapchain_images.size());
+
+	for (size_t i = 0; i < m_swapchain_images.size(); ++i) {
+		VkImageViewCreateInfo create_info = {};
+		create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		create_info.image = m_swapchain_images[i];
+		create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		create_info.format = m_swapchain_format;
+
+		create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+		create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		create_info.subresourceRange.baseMipLevel = 0;
+		create_info.subresourceRange.levelCount = 1;
+		create_info.subresourceRange.baseArrayLayer = 0;
+		create_info.subresourceRange.layerCount = 1;
+			 
+		if (vkCreateImageView(m_logical_device, &create_info, nullptr, &m_swapchain_image_views[i]) != VK_SUCCESS)
+			throw std::runtime_error("Failed to create image view.");
+	}
+}
+
+void VulkanProg::createGraphicsPipeline()
+{
+
+}
+
 bool VulkanProg::isDeviceSuitable(VkPhysicalDevice device)
 {
 	//VkPhysicalDeviceProperties dev_properties;
@@ -445,7 +483,7 @@ VkExtent2D VulkanProg::chooseSwapExtent(const VkSurfaceCapabilitiesKHR & capabil
 	if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
 		return capabilities.currentExtent;
 	else {
-		VkExtent2D actual_extent = { WIDTH, HEIGHT };
+		VkExtent2D actual_extent = { static_cast<uint32_t>(WIDTH), static_cast<uint32_t>(HEIGHT) };
 		actual_extent.width = std::clamp(actual_extent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
 		actual_extent.height = std::clamp(actual_extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
 		return actual_extent;
