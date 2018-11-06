@@ -7,3 +7,4 @@
 /x64
 /VulkanCppProgram1/VulkanCppProgram1.vcxproj.user
 /VulkanCppProgram1/VulkanCppProgram1.vcxproj.filters
+*.spv

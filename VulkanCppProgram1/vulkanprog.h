@@ -34,6 +34,7 @@ private:
 	void createSwapChain();
 	void createImageViews();
 	void createGraphicsPipeline();
+	VkShaderModule createShaderModule(const std::vector<char>& bytecode);
 	bool isDeviceSuitable(VkPhysicalDevice device);
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
@@ -55,6 +56,7 @@ private:
 	VkExtent2D m_swapchain_extent;
 	std::vector<VkImage> m_swapchain_images;
 	std::vector<VkImageView> m_swapchain_image_views;
+	VkPipelineLayout m_pipeline_layout;
 
 	const int WIDTH = 800;
 	const int HEIGHT = 600;
