@@ -20,6 +20,11 @@ public:
 		cleanup();
 	}
 
+	void setFramebufferResized(bool resized)
+	{
+		m_framebuffer_resized = resized;
+	}
+
 private:
 	void initVulkan();
 	void initWindow();
@@ -40,6 +45,9 @@ private:
 	void createCommandBuffers();
 	void createSyncObjects();
 	void drawFrame();
+
+	void cleanupSwapChain();
+	void rebuildSwapChain();
 
 	VkShaderModule createShaderModule(const std::vector<char>& bytecode);
 	bool isDeviceSuitable(VkPhysicalDevice device);
@@ -73,6 +81,7 @@ private:
 	std::vector<VkSemaphore> m_render_finished_semaphores;
 	std::vector<VkFence> m_inflight_fences;
 	size_t m_current_frame = 0;
+	bool m_framebuffer_resized = false;
 
 	const int WIDTH = 800;
 	const int HEIGHT = 600;

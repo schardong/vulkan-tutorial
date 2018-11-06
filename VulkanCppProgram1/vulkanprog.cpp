@@ -56,6 +56,13 @@ static std::vector<char> read_shader(const std::string& path)
 }
 
 
+static void framebufferResizeCb(GLFWwindow* window, int width, int height)
+{
+	auto app = reinterpret_cast<VulkanProg*>(glfwGetWindowUserPointer(window));
+	app->setFramebufferResized(true);
+}
+
+
 bool checkDeviceExtensionSupport(VkPhysicalDevice device)
 {
 	uint32_t extension_count = 0;
@@ -172,9 +179,10 @@ void VulkanProg::initWindow()
 {
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
 	m_window = glfwCreateWindow(WIDTH, HEIGHT, "Basic triangle with Vulkan", nullptr, nullptr);
+	glfwSetWindowUserPointer(m_window, this);
+	glfwSetFramebufferSizeCallback(m_window, framebufferResizeCb);
 }
 
 void VulkanProg::mainLoop()
@@ -189,6 +197,8 @@ void VulkanProg::mainLoop()
 
 void VulkanProg::cleanup()
 {
+	cleanupSwapChain();
+
 	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
 		vkDestroySemaphore(m_logical_device, m_image_available_semaphores[i], nullptr);
 		vkDestroySemaphore(m_logical_device, m_render_finished_semaphores[i], nullptr);
@@ -196,16 +206,6 @@ void VulkanProg::cleanup()
 	}
 
 	vkDestroyCommandPool(m_logical_device, m_command_pool, nullptr);
-	for (auto fb : m_swapchain_framebuffers)
-		vkDestroyFramebuffer(m_logical_device, fb, nullptr);
-
-	vkDestroyPipeline(m_logical_device, m_graphics_pipeline, nullptr);
-	vkDestroyPipelineLayout(m_logical_device, m_pipeline_layout, nullptr);
-	vkDestroyRenderPass(m_logical_device, m_renderpass, nullptr);
-	for (auto iv : m_swapchain_image_views)
-		vkDestroyImageView(m_logical_device, iv, nullptr);
-
-	vkDestroySwapchainKHR(m_logical_device, m_swapchain, nullptr);
 	vkDestroyDevice(m_logical_device, nullptr);
 
 	if (enable_validation_layer)
@@ -213,6 +213,7 @@ void VulkanProg::cleanup()
 
 	vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
 	vkDestroyInstance(m_instance, nullptr);
+
 	glfwDestroyWindow(m_window);
 	glfwTerminate();
 }
@@ -738,9 +739,15 @@ void VulkanProg::createSyncObjects()
 void VulkanProg::drawFrame()
 {
 	vkWaitForFences(m_logical_device, 1, &m_inflight_fences[m_current_frame], VK_TRUE, std::numeric_limits<uint64_t>::max());
-	vkResetFences(m_logical_device, 1, &m_inflight_fences[m_current_frame]);
+
 	uint32_t image_idx;
-	vkAcquireNextImageKHR(m_logical_device, m_swapchain, std::numeric_limits<uint64_t>::max(), m_image_available_semaphores[m_current_frame], VK_NULL_HANDLE, &image_idx);
+	VkResult result = vkAcquireNextImageKHR(m_logical_device, m_swapchain, std::numeric_limits<uint64_t>::max(), m_image_available_semaphores[m_current_frame], VK_NULL_HANDLE, &image_idx);
+	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+		rebuildSwapChain();
+		return;
+	}
+	else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+		throw std::runtime_error("Failed to aquire swap chain image");
 
 	VkSemaphore wait_semaphores[] = { m_image_available_semaphores[m_current_frame] };
 	VkSemaphore signal_semaphores[] = { m_render_finished_semaphores[m_current_frame] };
@@ -756,6 +763,7 @@ void VulkanProg::drawFrame()
 	submit_info.signalSemaphoreCount = 1;
 	submit_info.pSignalSemaphores = signal_semaphores;
 
+	vkResetFences(m_logical_device, 1, &m_inflight_fences[m_current_frame]);
 	if (vkQueueSubmit(m_graphics_queue, 1, &submit_info, m_inflight_fences[m_current_frame]) != VK_SUCCESS)
 		throw std::runtime_error("Faield to submit draw command buffer");
 
@@ -770,8 +778,53 @@ void VulkanProg::drawFrame()
 	present_info.pImageIndices = &image_idx;
 	present_info.pResults = nullptr;
 
-	vkQueuePresentKHR(m_presentation_queue, &present_info);
+	result = vkQueuePresentKHR(m_presentation_queue, &present_info);
+	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || m_framebuffer_resized) {
+		m_framebuffer_resized = false;
+		rebuildSwapChain();
+	}
+	else if (result != VK_SUCCESS)
+		throw std::runtime_error("Failed to present swap chain image.");
+
 	m_current_frame = (m_current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
+}
+
+void VulkanProg::cleanupSwapChain()
+{
+	for (auto fb : m_swapchain_framebuffers)
+		vkDestroyFramebuffer(m_logical_device, fb, nullptr);
+
+	vkFreeCommandBuffers(m_logical_device, m_command_pool, static_cast<uint32_t>(m_command_buffers.size()), m_command_buffers.data());
+
+	vkDestroyPipeline(m_logical_device, m_graphics_pipeline, nullptr);
+	vkDestroyPipelineLayout(m_logical_device, m_pipeline_layout, nullptr);
+	vkDestroyRenderPass(m_logical_device, m_renderpass, nullptr);
+
+	for (auto iv : m_swapchain_image_views)
+		vkDestroyImageView(m_logical_device, iv, nullptr);
+
+	vkDestroySwapchainKHR(m_logical_device, m_swapchain, nullptr);
+}
+
+void VulkanProg::rebuildSwapChain()
+{
+	int width = 0;
+	int height = 0;
+	while (!width || !height) {
+		glfwGetFramebufferSize(m_window, &width, &height);
+		glfwWaitEvents();
+	}
+
+	vkDeviceWaitIdle(m_logical_device);
+
+	cleanupSwapChain();
+
+	createSwapChain();
+	createImageViews();
+	createRenderPass();
+	createGraphicsPipeline();
+	createFramebuffers();
+	createCommandBuffers();
 }
 
 VkShaderModule VulkanProg::createShaderModule(const std::vector<char>& bytecode)
@@ -892,7 +945,9 @@ VkExtent2D VulkanProg::chooseSwapExtent(const VkSurfaceCapabilitiesKHR & capabil
 	if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
 		return capabilities.currentExtent;
 	else {
-		VkExtent2D actual_extent = { static_cast<uint32_t>(WIDTH), static_cast<uint32_t>(HEIGHT) };
+		int width, height;
+		glfwGetFramebufferSize(m_window, &width, &height);
+		VkExtent2D actual_extent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
 		actual_extent.width = std::clamp(actual_extent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
 		actual_extent.height = std::clamp(actual_extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
 		return actual_extent;
