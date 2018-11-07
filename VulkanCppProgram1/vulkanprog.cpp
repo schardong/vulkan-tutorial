@@ -3,13 +3,16 @@
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
 
-#include <stdexcept>
-#include <iostream>
-#include <functional>
-#include <fstream>
+#include <glm/glm.hpp>
+
+#include <array>
 #include <cstdlib>
+#include <fstream>
+#include <functional>
+#include <iostream>
 #include <optional>
 #include <set>
+#include <stdexcept>
 
 #ifdef NDEBUG
 bool enable_validation_layer = false;
@@ -35,6 +38,46 @@ struct SwapChainSupportDetails
 	VkSurfaceCapabilitiesKHR surface_capabilities;
 	std::vector<VkSurfaceFormatKHR> surface_formats;
 	std::vector<VkPresentModeKHR> present_modes;
+};
+
+
+struct Vertex
+{
+	glm::vec2 pos;
+	glm::vec3 color;
+
+	static VkVertexInputBindingDescription getBindingDescription()
+	{
+		VkVertexInputBindingDescription binding_info = {};
+		binding_info.binding = 0;
+		binding_info.stride = sizeof(Vertex);
+		binding_info.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		return binding_info;
+	}
+
+	static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions()
+	{
+		std::array<VkVertexInputAttributeDescription, 2> attrib_info = {};
+
+		attrib_info[0].binding = 0;
+		attrib_info[0].location = 0;
+		attrib_info[0].format = VK_FORMAT_R32G32_SFLOAT;
+		attrib_info[0].offset = offsetof(Vertex, pos);
+
+		attrib_info[1].binding = 0;
+		attrib_info[1].location = 1;
+		attrib_info[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+		attrib_info[1].offset = offsetof(Vertex, color);
+
+		return attrib_info;
+	}
+};
+
+
+const std::vector<Vertex> g_vertices = {
+	{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+	{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+	{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
 };
 
 
@@ -171,6 +214,7 @@ void VulkanProg::initVulkan()
 	createGraphicsPipeline();
 	createFramebuffers();
 	createCommandPool();
+	createVertexBuffer();
 	createCommandBuffers();
 	createSyncObjects();
 }
@@ -198,6 +242,9 @@ void VulkanProg::mainLoop()
 void VulkanProg::cleanup()
 {
 	cleanupSwapChain();
+
+	vkDestroyBuffer(m_logical_device, m_vertex_buffer, nullptr);
+	vkFreeMemory(m_logical_device, m_vertex_buffer_memory, nullptr);
 
 	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
 		vkDestroySemaphore(m_logical_device, m_image_available_semaphores[i], nullptr);
@@ -514,12 +561,15 @@ void VulkanProg::createGraphicsPipeline()
 	VkPipelineShaderStageCreateInfo shader_stages[] = { vertex_stage_info, frag_stage_info };
 
 	// Vertex Input stage
+	auto binding_desc = Vertex::getBindingDescription();
+	auto attrib_desc = Vertex::getAttributeDescriptions();
+
 	VkPipelineVertexInputStateCreateInfo vertex_input_info = {};
 	vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertex_input_info.vertexBindingDescriptionCount = 0;
-	vertex_input_info.pVertexBindingDescriptions = nullptr;
-	vertex_input_info.vertexAttributeDescriptionCount = 0;
-	vertex_input_info.pVertexAttributeDescriptions = nullptr;
+	vertex_input_info.vertexBindingDescriptionCount = 1;
+	vertex_input_info.pVertexBindingDescriptions = &binding_desc;
+	vertex_input_info.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrib_desc.size());
+	vertex_input_info.pVertexAttributeDescriptions = attrib_desc.data();
 
 	// Vertex Assembly stage
 	VkPipelineInputAssemblyStateCreateInfo vertex_assembly_info = {};
@@ -705,7 +755,12 @@ void VulkanProg::createCommandBuffers()
 
 		vkCmdBeginRenderPass(m_command_buffers[i], &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
 		vkCmdBindPipeline(m_command_buffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphics_pipeline);
-		vkCmdDraw(m_command_buffers[i], 3, 1, 0, 0);
+
+		VkBuffer vertex_buffers[] = { m_vertex_buffer };
+		VkDeviceSize offsets[] = { 0 };
+		vkCmdBindVertexBuffers(m_command_buffers[i], 0, 1, vertex_buffers, offsets);
+
+		vkCmdDraw(m_command_buffers[i], static_cast<uint32_t>(g_vertices.size()), 1, 0, 0);
 		vkCmdEndRenderPass(m_command_buffers[i]);
 
 		if (vkEndCommandBuffer(m_command_buffers[i]) != VK_SUCCESS)
@@ -765,7 +820,7 @@ void VulkanProg::drawFrame()
 
 	vkResetFences(m_logical_device, 1, &m_inflight_fences[m_current_frame]);
 	if (vkQueueSubmit(m_graphics_queue, 1, &submit_info, m_inflight_fences[m_current_frame]) != VK_SUCCESS)
-		throw std::runtime_error("Faield to submit draw command buffer");
+		throw std::runtime_error("Failed to submit draw command buffer");
 
 	VkSwapchainKHR swap_chains[] = { m_swapchain };
 
@@ -787,6 +842,36 @@ void VulkanProg::drawFrame()
 		throw std::runtime_error("Failed to present swap chain image.");
 
 	m_current_frame = (m_current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
+}
+
+void VulkanProg::createVertexBuffer()
+{
+	VkBufferCreateInfo buffer_info = {};
+	buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	buffer_info.size = sizeof(g_vertices[0]) * g_vertices.size();
+	buffer_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	if (vkCreateBuffer(m_logical_device, &buffer_info, nullptr, &m_vertex_buffer) != VK_SUCCESS)
+		throw std::runtime_error("Failed to create vertex buffer.");
+
+	VkMemoryRequirements mem_requirements = {};
+	vkGetBufferMemoryRequirements(m_logical_device, m_vertex_buffer, &mem_requirements);
+
+	VkMemoryAllocateInfo alloc_info = {};
+	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	alloc_info.allocationSize = mem_requirements.size;
+	alloc_info.memoryTypeIndex = findMemoryType(mem_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+	if (vkAllocateMemory(m_logical_device, &alloc_info, nullptr, &m_vertex_buffer_memory) != VK_SUCCESS)
+		throw std::runtime_error("Failed to allocate vertex buffer memory.");
+
+	vkBindBufferMemory(m_logical_device, m_vertex_buffer, m_vertex_buffer_memory, 0);
+
+	void* data;
+	vkMapMemory(m_logical_device, m_vertex_buffer_memory, 0, buffer_info.size, 0, &data);
+	memcpy(data, g_vertices.data(), (size_t)buffer_info.size);
+	vkUnmapMemory(m_logical_device, m_vertex_buffer_memory);
 }
 
 void VulkanProg::cleanupSwapChain()
@@ -952,4 +1037,16 @@ VkExtent2D VulkanProg::chooseSwapExtent(const VkSurfaceCapabilitiesKHR & capabil
 		actual_extent.height = std::clamp(actual_extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
 		return actual_extent;
 	}
+}
+
+uint32_t VulkanProg::findMemoryType(uint32_t type_filter, VkMemoryPropertyFlags properties)
+{
+	VkPhysicalDeviceMemoryProperties mem_props;
+	vkGetPhysicalDeviceMemoryProperties(m_device, &mem_props);
+
+	for (uint32_t i = 0; i < mem_props.memoryTypeCount; ++i)
+		if ((type_filter & (1 << i)) && (mem_props.memoryTypes[i].propertyFlags & properties) == properties)
+			return i;
+
+	throw std::runtime_error("Failed to find suitable memory type.");
 }

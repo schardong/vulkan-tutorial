@@ -7,6 +7,7 @@
 struct GLFWwindow;
 struct QueueFamilyIndices;
 struct SwapChainSupportDetails;
+struct Vertex;
 
 
 class VulkanProg
@@ -45,6 +46,7 @@ private:
 	void createCommandBuffers();
 	void createSyncObjects();
 	void drawFrame();
+	void createVertexBuffer();
 
 	void cleanupSwapChain();
 	void rebuildSwapChain();
@@ -56,6 +58,7 @@ private:
 	VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& available_formats);
 	VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& available_present_modes);
 	VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
+	uint32_t findMemoryType(uint32_t type_filter, VkMemoryPropertyFlags properties);
 
 private:
 	GLFWwindow* m_window;
@@ -82,6 +85,8 @@ private:
 	std::vector<VkFence> m_inflight_fences;
 	size_t m_current_frame = 0;
 	bool m_framebuffer_resized = false;
+	VkBuffer m_vertex_buffer;
+	VkDeviceMemory m_vertex_buffer_memory;
 
 	const int WIDTH = 800;
 	const int HEIGHT = 600;
