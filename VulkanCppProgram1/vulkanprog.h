@@ -47,6 +47,7 @@ private:
 	void createSyncObjects();
 	void drawFrame();
 	void createVertexBuffer();
+	void createIndexBuffer();
 
 	void cleanupSwapChain();
 	void rebuildSwapChain();
@@ -83,12 +84,14 @@ private:
 	std::vector<VkSemaphore> m_render_finished_semaphores;
 	std::vector<VkFence> m_inflight_fences;
 	size_t m_current_frame = 0;
-	bool m_framebuffer_resized = false;
 	VkBuffer m_vertex_buffer;
 	VkDeviceMemory m_vertex_buffer_memory;
+	VkBuffer m_index_buffer;
+	VkDeviceMemory m_index_buffer_memory;
 
 	const int WIDTH = 800;
 	const int HEIGHT = 600;
+	bool m_framebuffer_resized = false;
 };
 
 
