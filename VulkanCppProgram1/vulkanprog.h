@@ -48,6 +48,11 @@ private:
 	void drawFrame();
 	void createVertexBuffer();
 	void createIndexBuffer();
+	void createDescriptorSetLayout();
+	void createUniformBuffer();
+	void createDescriptorPool();
+	void createDescriptorSets();
+	void updateUniformBuffer(uint32_t image_index);
 
 	void cleanupSwapChain();
 	void rebuildSwapChain();
@@ -75,6 +80,7 @@ private:
 	std::vector<VkImage> m_swapchain_images;
 	std::vector<VkImageView> m_swapchain_image_views;
 	VkRenderPass m_renderpass;
+	VkDescriptorSetLayout m_descriptor_set_layout;
 	VkPipelineLayout m_pipeline_layout;
 	VkPipeline m_graphics_pipeline;
 	std::vector<VkFramebuffer> m_swapchain_framebuffers;
@@ -88,6 +94,10 @@ private:
 	VkDeviceMemory m_vertex_buffer_memory;
 	VkBuffer m_index_buffer;
 	VkDeviceMemory m_index_buffer_memory;
+	std::vector<VkBuffer> m_uniform_buffers;
+	std::vector<VkDeviceMemory> m_uniform_buffer_memories;
+	VkDescriptorPool m_descriptor_pool;
+	std::vector<VkDescriptorSet> m_descriptor_sets;
 
 	const int WIDTH = 800;
 	const int HEIGHT = 600;
