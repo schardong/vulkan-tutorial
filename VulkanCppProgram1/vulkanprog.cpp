@@ -122,6 +122,42 @@ bool checkDeviceExtensionSupport(VkPhysicalDevice device)
 }
 
 
+static void copyBuffer(VkDevice logical_device, VkCommandPool cmd_pool, VkQueue queue, VkBuffer src, VkBuffer dst, VkDeviceSize size)
+{
+	VkCommandBufferAllocateInfo alloc_info = {};
+	alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	alloc_info.commandPool = cmd_pool;
+	alloc_info.commandBufferCount = 1;
+
+	VkCommandBuffer cmd_buffer;
+	if (vkAllocateCommandBuffers(logical_device, &alloc_info, &cmd_buffer) != VK_SUCCESS)
+		throw std::runtime_error("Failed to allocate command buffer for copy.");
+
+	VkCommandBufferBeginInfo begin_info = {};
+	begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+	vkBeginCommandBuffer(cmd_buffer, &begin_info);
+	VkBufferCopy copy_region = {};
+	copy_region.srcOffset = 0;
+	copy_region.dstOffset = 0;
+	copy_region.size = size;
+	vkCmdCopyBuffer(cmd_buffer, src, dst, 1, &copy_region);
+	vkEndCommandBuffer(cmd_buffer);
+
+	VkSubmitInfo submit_info = {};
+	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submit_info.commandBufferCount = 1;
+	submit_info.pCommandBuffers = &cmd_buffer;
+
+	vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE);
+	vkQueueWaitIdle(queue);
+
+	vkFreeCommandBuffers(logical_device, cmd_pool, 1, &cmd_buffer);
+}
+
+
 static uint32_t findMemoryType(VkPhysicalDevice device, uint32_t type_filter, VkMemoryPropertyFlags properties)
 {
 	VkPhysicalDeviceMemoryProperties mem_props;
@@ -888,14 +924,25 @@ void VulkanProg::drawFrame()
 void VulkanProg::createVertexBuffer()
 {
 	VkDeviceSize buffer_size = sizeof(g_vertices[0]) * g_vertices.size();
-	createBuffer(m_device, m_logical_device, buffer_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+
+	VkBuffer staging_buffer;
+	VkDeviceMemory staging_buffer_memory;
+	createBuffer(m_device, m_logical_device, buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		m_vertex_buffer, m_vertex_buffer_memory);
+		staging_buffer, staging_buffer_memory);
 
 	void* data;
-	vkMapMemory(m_logical_device, m_vertex_buffer_memory, 0, buffer_size, 0, &data);
+	vkMapMemory(m_logical_device, staging_buffer_memory, 0, buffer_size, 0, &data);
 	memcpy(data, g_vertices.data(), (size_t)buffer_size);
-	vkUnmapMemory(m_logical_device, m_vertex_buffer_memory);
+	vkUnmapMemory(m_logical_device, staging_buffer_memory);
+
+	createBuffer(m_device, m_logical_device, buffer_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, m_vertex_buffer, m_vertex_buffer_memory);
+
+	copyBuffer(m_logical_device, m_command_pool, m_graphics_queue, staging_buffer, m_vertex_buffer, buffer_size);
+
+	vkDestroyBuffer(m_logical_device, staging_buffer, nullptr);
+	vkFreeMemory(m_logical_device, staging_buffer_memory, nullptr);
 }
 
 void VulkanProg::cleanupSwapChain()
