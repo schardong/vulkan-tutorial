@@ -58,7 +58,6 @@ private:
 	VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& available_formats);
 	VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& available_present_modes);
 	VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
-	uint32_t findMemoryType(uint32_t type_filter, VkMemoryPropertyFlags properties);
 
 private:
 	GLFWwindow* m_window;

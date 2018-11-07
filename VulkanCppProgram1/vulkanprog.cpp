@@ -122,6 +122,47 @@ bool checkDeviceExtensionSupport(VkPhysicalDevice device)
 }
 
 
+static uint32_t findMemoryType(VkPhysicalDevice device, uint32_t type_filter, VkMemoryPropertyFlags properties)
+{
+	VkPhysicalDeviceMemoryProperties mem_props;
+	vkGetPhysicalDeviceMemoryProperties(device, &mem_props);
+
+	for (uint32_t i = 0; i < mem_props.memoryTypeCount; ++i)
+		if ((type_filter & (1 << i)) && (mem_props.memoryTypes[i].propertyFlags & properties) == properties)
+			return i;
+
+	throw std::runtime_error("Failed to find suitable memory type.");
+}
+
+
+static void createBuffer(VkPhysicalDevice phys_device, VkDevice logical_device, VkDeviceSize size,
+	VkBufferUsageFlags usage_flags, VkMemoryPropertyFlags prop_flags, VkBuffer & buffer,
+	VkDeviceMemory & buffer_memory)
+{
+	VkBufferCreateInfo buffer_info = {};
+	buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	buffer_info.size = size;
+	buffer_info.usage = usage_flags;
+	buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	if (vkCreateBuffer(logical_device, &buffer_info, nullptr, &buffer) != VK_SUCCESS)
+		throw std::runtime_error("Failed to create buffer.");
+
+	VkMemoryRequirements mem_requirements;
+	vkGetBufferMemoryRequirements(logical_device, buffer, &mem_requirements);
+
+	VkMemoryAllocateInfo alloc_info = {};
+	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	alloc_info.allocationSize = mem_requirements.size;
+	alloc_info.memoryTypeIndex = findMemoryType(phys_device, mem_requirements.memoryTypeBits, prop_flags);
+
+	if (vkAllocateMemory(logical_device, &alloc_info, nullptr, &buffer_memory) != VK_SUCCESS)
+		throw std::runtime_error("Failed to allocate buffer memory.");
+
+	vkBindBufferMemory(logical_device, buffer, buffer_memory, 0);
+}
+
+
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCb(
 	VkDebugUtilsMessageSeverityFlagBitsEXT msg_severity,
 	VkDebugUtilsMessageTypeFlagsEXT msg_type,
@@ -846,31 +887,14 @@ void VulkanProg::drawFrame()
 
 void VulkanProg::createVertexBuffer()
 {
-	VkBufferCreateInfo buffer_info = {};
-	buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	buffer_info.size = sizeof(g_vertices[0]) * g_vertices.size();
-	buffer_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-	buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-	if (vkCreateBuffer(m_logical_device, &buffer_info, nullptr, &m_vertex_buffer) != VK_SUCCESS)
-		throw std::runtime_error("Failed to create vertex buffer.");
-
-	VkMemoryRequirements mem_requirements = {};
-	vkGetBufferMemoryRequirements(m_logical_device, m_vertex_buffer, &mem_requirements);
-
-	VkMemoryAllocateInfo alloc_info = {};
-	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	alloc_info.allocationSize = mem_requirements.size;
-	alloc_info.memoryTypeIndex = findMemoryType(mem_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-	if (vkAllocateMemory(m_logical_device, &alloc_info, nullptr, &m_vertex_buffer_memory) != VK_SUCCESS)
-		throw std::runtime_error("Failed to allocate vertex buffer memory.");
-
-	vkBindBufferMemory(m_logical_device, m_vertex_buffer, m_vertex_buffer_memory, 0);
+	VkDeviceSize buffer_size = sizeof(g_vertices[0]) * g_vertices.size();
+	createBuffer(m_device, m_logical_device, buffer_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		m_vertex_buffer, m_vertex_buffer_memory);
 
 	void* data;
-	vkMapMemory(m_logical_device, m_vertex_buffer_memory, 0, buffer_info.size, 0, &data);
-	memcpy(data, g_vertices.data(), (size_t)buffer_info.size);
+	vkMapMemory(m_logical_device, m_vertex_buffer_memory, 0, buffer_size, 0, &data);
+	memcpy(data, g_vertices.data(), (size_t)buffer_size);
 	vkUnmapMemory(m_logical_device, m_vertex_buffer_memory);
 }
 
@@ -944,8 +968,6 @@ bool VulkanProg::isDeviceSuitable(VkPhysicalDevice device)
 	}
 
 	return indices.isComplete() && extensions_supported && swap_chain_adequate;
-	//dev_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
-		
 }
 
 QueueFamilyIndices VulkanProg::findQueueFamilies(VkPhysicalDevice device)
@@ -1037,16 +1059,4 @@ VkExtent2D VulkanProg::chooseSwapExtent(const VkSurfaceCapabilitiesKHR & capabil
 		actual_extent.height = std::clamp(actual_extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
 		return actual_extent;
 	}
-}
-
-uint32_t VulkanProg::findMemoryType(uint32_t type_filter, VkMemoryPropertyFlags properties)
-{
-	VkPhysicalDeviceMemoryProperties mem_props;
-	vkGetPhysicalDeviceMemoryProperties(m_device, &mem_props);
-
-	for (uint32_t i = 0; i < mem_props.memoryTypeCount; ++i)
-		if ((type_filter & (1 << i)) && (mem_props.memoryTypes[i].propertyFlags & properties) == properties)
-			return i;
-
-	throw std::runtime_error("Failed to find suitable memory type.");
 }
