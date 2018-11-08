@@ -49,6 +49,7 @@ private:
 	void createVertexBuffer();
 	void createIndexBuffer();
 	void createTextureImage();
+	void createTextureSampler();
 	void createDescriptorSetLayout();
 	void createUniformBuffer();
 	void createDescriptorPool();
@@ -101,6 +102,8 @@ private:
 	std::vector<VkDescriptorSet> m_descriptor_sets;
 	VkImage m_texture_image;
 	VkDeviceMemory m_texture_image_memory;
+	VkImageView m_texture_image_view;
+	VkSampler m_texture_sampler;
 
 	const int WIDTH = 800;
 	const int HEIGHT = 600;
