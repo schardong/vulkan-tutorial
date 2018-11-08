@@ -48,6 +48,7 @@ private:
 	void drawFrame();
 	void createVertexBuffer();
 	void createIndexBuffer();
+	void createTextureImage();
 	void createDescriptorSetLayout();
 	void createUniformBuffer();
 	void createDescriptorPool();
@@ -98,6 +99,8 @@ private:
 	std::vector<VkDeviceMemory> m_uniform_buffer_memories;
 	VkDescriptorPool m_descriptor_pool;
 	std::vector<VkDescriptorSet> m_descriptor_sets;
+	VkImage m_texture_image;
+	VkDeviceMemory m_texture_image_memory;
 
 	const int WIDTH = 800;
 	const int HEIGHT = 600;
